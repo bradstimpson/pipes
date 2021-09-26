@@ -2,7 +2,7 @@
 
 # pipes
 
-<img align="right" src="https://raw.githubusercontent.com/bradstimpson/pipes/main/pipes.jpg" style="margin-left:20px">
+<img align="right" src="https://github.com/bradstimpson/pipes/raw/master/pipes.jpg" style="margin-left:20px">
 
 ## A library for performing data pipeline / ETL tasks in Go
 
