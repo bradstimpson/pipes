@@ -15,7 +15,7 @@ import (
 
 // sql_dump handles large data dumps into the postgres database.
 
-type SQLWriter struct {
+type SQLDumper struct {
 	writeDB          *sql.DB
 	TableName        string
 	OnDupKeyUpdate   bool
@@ -24,18 +24,18 @@ type SQLWriter struct {
 	BatchSize        int
 }
 
-type SQLWriterData struct {
+type SQLDumperData struct {
 	TableName  string      `json:"table_name"`
 	InsertData interface{} `json:"insert_data"`
 }
 
 // NewSQLWriter returns a new SQLWriter
-func NewSQLWriter(db *sql.DB, tableName string) *SQLWriter {
-	return &SQLWriter{writeDB: db, TableName: tableName, OnDupKeyUpdate: true}
+func NewSQLDumper(db *sql.DB, tableName string) *SQLWriter {
+	return &SQLDumper{writeDB: db, TableName: tableName, OnDupKeyUpdate: true}
 }
 
 // ProcessData defers to util.SQLInsertData
-func (s *SQLWriter) ProcessData(d data.JSON, outputChan chan data.JSON, killChan chan error) {
+func (s *SQLDumper) ProcessData(d data.JSON, outputChan chan data.JSON, killChan chan error) {
 	defer func() {
 		if err := recover(); err != nil {
 			util.KillPipelineIfErr(err.(error), killChan)
@@ -43,25 +43,25 @@ func (s *SQLWriter) ProcessData(d data.JSON, outputChan chan data.JSON, killChan
 	}()
 
 	logger.Info("SQLWriterv2: Writing data...")
-	test := SQLInsertData(s.writeDB, d, s.TableName, s.OnDupKeyUpdate, s.OnDupKeyFields, s.BatchSize)
-	util.KillPipelineIfErr(test, killChan)
+	dumped := SQLDumpData(s.writeDB, d, s.TableName, s.OnDupKeyUpdate, s.OnDupKeyFields, s.BatchSize)
+	util.KillPipelineIfErr(dumped, killChan)
 	logger.Info("SQLWriter: Write complete")
 }
 
 // Finish - see interface for documentation.
-func (s *SQLWriter) Finish(outputChan chan data.JSON, killChan chan error) {
+func (s *SQLDumper) Finish(outputChan chan data.JSON, killChan chan error) {
 }
 
-func (s *SQLWriter) String() string {
-	return "SQLWriter"
+func (s *SQLDumper) String() string {
+	return "SQLDumper"
 }
 
 // Concurrency defers to ConcurrentDataProcessor
-func (s *SQLWriter) Concurrency() int {
+func (s *SQLDumper) Concurrency() int {
 	return s.ConcurrencyLevel
 }
 
-func SQLInsertData(db *sql.DB, d data.JSON, tableName string, onDupKeyUpdate bool, onDupKeyFields []string, batchSize int) error {
+func SQLDumpData(db *sql.DB, d data.JSON, tableName string, onDupKeyUpdate bool, onDupKeyFields []string, batchSize int) error {
 	objects, err := data.ObjectsFromJSON(d)
 	fmt.Println(objects)
 	if err != nil {
