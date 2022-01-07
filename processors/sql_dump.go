@@ -9,7 +9,7 @@ import (
 	"github.com/bradstimpson/pipes/data"
 	"github.com/bradstimpson/pipes/logger"
 	"github.com/bradstimpson/pipes/util"
-	"github.com/gary23w/goapp/internal/utils"
+	"github.com/bradstimpson/pipes/processors/utils"
 	"github.com/k0kubun/go-ansi"
 )
 
