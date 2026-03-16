@@ -8,8 +8,8 @@ import (
 
 	"github.com/bradstimpson/pipes/data"
 	"github.com/bradstimpson/pipes/logger"
-	"github.com/bradstimpson/pipes/util"
 	"github.com/bradstimpson/pipes/processors/utils"
+	"github.com/bradstimpson/pipes/util"
 	"github.com/k0kubun/go-ansi"
 )
 
@@ -29,8 +29,8 @@ type SQLDumperData struct {
 	InsertData interface{} `json:"insert_data"`
 }
 
-// NewSQLWriter returns a new SQLWriter
-func NewSQLDumper(db *sql.DB, tableName string) *SQLWriter {
+// NewSQLDumper returns a new SQLDumper
+func NewSQLDumper(db *sql.DB, tableName string) *SQLDumper {
 	return &SQLDumper{writeDB: db, TableName: tableName, OnDupKeyUpdate: true}
 }
 
@@ -89,7 +89,7 @@ func dumpSql(dump bool, db *sql.DB, objects []map[string]interface{}, tableName 
 	cols := sortedColumns(objects)
 	fmt.Println(cols)
 	if dump {
-		logger.Debug("SQLDumpData: dump mode: %v", dump)
+		logger.Debug("SQLDumpData: dump mode: ", dump)
 		bar := utils.NewOptions(len(objects),
 			utils.OptionSetWriter(ansi.NewAnsiStdout()),
 			utils.OptionEnableColorCodes(true),

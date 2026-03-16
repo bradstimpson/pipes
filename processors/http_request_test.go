@@ -11,7 +11,7 @@ import (
 	"github.com/bradstimpson/pipes/processors"
 )
 
-func ExampleGetRequest() {
+func ExampleNewHTTPRequest() {
 	logger.LogLevel = logger.LevelSilent
 
 	getGoogle, err := processors.NewHTTPRequest("GET", "http://www.google.com", nil)

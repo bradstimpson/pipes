@@ -20,7 +20,7 @@ const (
 // pipesNotifier is an interface for receiving log events. See the
 // Notifier variable.
 type pipesNotifier interface {
-	pipesNotify(lvl int, trace []byte, v ...interface{})
+	pipesNotify(lvl int, trace []byte, v ...any)
 }
 
 // Notifier can be set to receive log events in your external
@@ -34,24 +34,24 @@ var LogLevel = LevelInfo
 var defaultLogger = log.New(os.Stdout, "", log.LstdFlags)
 
 // Debug logs output when LogLevel is set to at least Debug level
-func Debug(v ...interface{}) {
-	logit(LevelDebug, v)
+func Debug(v ...any) {
+	logit(LevelDebug, v...)
 	if Notifier != nil {
 		Notifier.pipesNotify(LevelDebug, nil, v)
 	}
 }
 
 // Info logs output when LogLevel is set to at least Info level
-func Info(v ...interface{}) {
-	logit(LevelInfo, v)
+func Info(v ...any) {
+	logit(LevelInfo, v...)
 	if Notifier != nil {
 		Notifier.pipesNotify(LevelInfo, nil, v)
 	}
 }
 
 // Error logs output when LogLevel is set to at least Error level
-func Error(v ...interface{}) {
-	logit(LevelError, v)
+func Error(v ...any) {
+	logit(LevelError, v...)
 	if Notifier != nil {
 		trace := make([]byte, 4096)
 		runtime.Stack(trace, true)
@@ -62,8 +62,8 @@ func Error(v ...interface{}) {
 // ErrorWithoutTrace logs output when LogLevel is set to at least Error level
 // but doesn't send the stack trace to Notifier. This is useful only when
 // using a pipesNotifier implementation.
-func ErrorWithoutTrace(v ...interface{}) {
-	logit(LevelError, v)
+func ErrorWithoutTrace(v ...any) {
+	logit(LevelError, v...)
 	if Notifier != nil {
 		Notifier.pipesNotify(LevelError, nil, v)
 	}
@@ -71,14 +71,14 @@ func ErrorWithoutTrace(v ...interface{}) {
 
 // Status logs output when LogLevel is set to at least Status level
 // Status output is high-level status events like stages starting/completing.
-func Status(v ...interface{}) {
-	logit(LevelStatus, v)
+func Status(v ...any) {
+	logit(LevelStatus, v...)
 	if Notifier != nil {
 		Notifier.pipesNotify(LevelStatus, nil, v)
 	}
 }
 
-func logit(lvl int, v ...interface{}) {
+func logit(lvl int, v ...any) {
 	if lvl >= LogLevel {
 		defaultLogger.Println(v...)
 	}
