@@ -56,7 +56,7 @@ func (w *CSVWriter) Write(record []string) (err error) {
 		for _, r1 := range field {
 			switch r1 {
 			case '"':
-				_, err = w.w.WriteString(fmt.Sprintf(`%v"`, w.QuoteEscape))
+				_, err = fmt.Fprintf(w.w, `%v"`, w.QuoteEscape)
 			case '\r':
 				if !w.UseCRLF {
 					err = w.w.WriteByte('\r')
@@ -131,7 +131,7 @@ func (w *CSVWriter) fieldNeedsQuotes(field string) bool {
 	if field == "" {
 		return false
 	}
-	if field == `\.` || strings.IndexRune(field, w.Comma) >= 0 || strings.IndexAny(field, "\"\r\n") >= 0 {
+	if field == `\.` || strings.ContainsRune(field, w.Comma) || strings.ContainsAny(field, "\"\r\n") {
 		return true
 	}
 

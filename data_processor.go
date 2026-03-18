@@ -36,13 +36,16 @@ type dataProcessor struct {
 	concurrentDataProcessor
 	chanBrancher
 	chanMerger
-	outputs    []DataProcessor
-	inputChan  chan data.JSON
-	outputChan chan data.JSON
+	outputs         []DataProcessor
+	inputChan       chan data.JSON
+	closeOutputOnce sync.Once
+	closeInputOnce  sync.Once
+	outputChan      chan data.JSON
 }
 
 type chanBrancher struct {
-	branchOutChans []chan data.JSON
+	branchOutChans     []chan data.JSON
+	branchOutCloseOnce []sync.Once
 }
 
 func (dp *dataProcessor) branchOut() {
@@ -57,9 +60,13 @@ func (dp *dataProcessor) branchOut() {
 			}
 			dp.recordDataSent(d)
 		}
-		// Once all data is received, also close all the outputs
-		for _, out := range dp.branchOutChans {
-			close(out)
+		// Close branchOutChans to signal downstream completion, only once per channel
+		if len(dp.branchOutChans) > 0 && len(dp.branchOutCloseOnce) == len(dp.branchOutChans) {
+			for i, out := range dp.branchOutChans {
+				dp.branchOutCloseOnce[i].Do(func() {
+					close(out)
+				})
+			}
 		}
 	}()
 }
@@ -70,21 +77,25 @@ type chanMerger struct {
 }
 
 func (dp *dataProcessor) mergeIn() {
-	// Start a merge goroutine for each input channel.
-	mergeData := func(c chan data.JSON) {
-		for d := range c {
-			dp.inputChan <- d
+	// Reset WaitGroup to prevent reuse panic
+	dp.mergeWait = sync.WaitGroup{}
+	if len(dp.mergeInChans) > 0 {
+		dp.mergeWait.Add(len(dp.mergeInChans))
+		for _, in := range dp.mergeInChans {
+			go func(c chan data.JSON) {
+				for d := range c {
+					dp.inputChan <- d
+				}
+				dp.mergeWait.Done()
+			}(in)
 		}
-		dp.mergeWait.Done()
-	}
-	dp.mergeWait.Add(len(dp.mergeInChans))
-	for _, in := range dp.mergeInChans {
-		go mergeData(in)
 	}
 
 	go func() {
 		dp.mergeWait.Wait()
-		close(dp.inputChan)
+		dp.closeInputOnce.Do(func() {
+			close(dp.inputChan)
+		})
 	}()
 }
 

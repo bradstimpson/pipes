@@ -1,4 +1,4 @@
-package utils
+package tui
 
 var spinners = map[int][]string{
 	0:  {"←", "↖", "↑", "↗", "→", "↘", "↓", "↙"},

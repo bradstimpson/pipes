@@ -83,12 +83,14 @@ func (p *Pipeline) connectStages() {
 		for _, from := range stage.processors {
 			if from.outputs != nil {
 				from.branchOutChans = []chan data.JSON{}
+				from.branchOutCloseOnce = []sync.Once{}
 				for _, to := range p.dataProcessorOutputs(from) {
 					if to.mergeInChans == nil {
 						to.mergeInChans = []chan data.JSON{}
 					}
 					c := p.initDataChan()
 					from.branchOutChans = append(from.branchOutChans, c)
+					from.branchOutCloseOnce = append(from.branchOutCloseOnce, sync.Once{})
 					to.mergeInChans = append(to.mergeInChans, c)
 				}
 			}
@@ -127,9 +129,12 @@ func (p *Pipeline) runStages(killChan chan error) {
 				}
 				logger.Info(p.Name, "- stage", n+1, dp, "input closed, calling Finish")
 				dp.Finish(dp.outputChan, killChan)
+				// Prevent double close: use sync.Once on the dataProcessor instance
 				if dp.outputChan != nil {
 					logger.Info(p.Name, "- stage", n+1, dp, "closing output")
-					close(dp.outputChan)
+					dp.closeOutputOnce.Do(func() {
+						close(dp.outputChan)
+					})
 				}
 				p.wg.Done()
 			}(n, dp)
@@ -152,9 +157,23 @@ func (p *Pipeline) Run() (killChan chan error) {
 
 	for _, dp := range p.layout.stages[0].processors {
 		logger.Debug(p.Name, ": sending", StartSignal, "to", dp)
-		dp.inputChan <- data.JSON(StartSignal)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(p.Name, "panic sending StartSignal to inputChan:", r)
+				}
+			}()
+			dp.inputChan <- data.JSON(StartSignal)
+		}()
 		dp.Finish(dp.outputChan, killChan)
-		close(dp.inputChan)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(p.Name, "panic closing inputChan:", r)
+				}
+			}()
+			close(dp.inputChan)
+		}()
 	}
 
 	// After all the stages are running, send the StartSignal

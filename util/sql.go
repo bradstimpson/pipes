@@ -229,62 +229,53 @@ func insertObjects(db *sql.DB, objects []map[string]interface{}, tableName strin
 
 	res, err := stmt.Exec(vals...)
 	if err != nil {
-		return err
-	}
-	lastID, err := res.LastInsertId()
-	if err != nil {
+		logger.Error("SQLInsertData: error executing SQL")
 		return err
 	}
 	rowCnt, err := res.RowsAffected()
 	if err != nil {
+		logger.Error("SQLInsertData: error getting rows affected")
 		return err
 	}
-
-	logger.Info(fmt.Sprintf("SQLInsertData: rows affected = %d, last insert ID = %d", rowCnt, lastID))
+	logger.Info(fmt.Sprintf("SQLInsertData: rows affected = %d", rowCnt))
 	return nil
 }
 
 func buildInsertSQL(objects []map[string]interface{}, tableName string, onDupKeyUpdate bool, onDupKeyFields []string) (insertSQL string, vals []interface{}) {
 	cols := sortedColumns(objects)
 
-	// Format: INSERT INTO tablename(col1,col2) VALUES(?,?),(?,?)
+	// Format: INSERT INTO tablename(col1,col2) VALUES($1,$2),($3,$4)
 	insertSQL = fmt.Sprintf("INSERT INTO %v(%v) VALUES", tableName, strings.Join(cols, ","))
 
-	// builds the (?,?) part
-	qs := "("
-	for i := 0; i < len(cols); i++ {
-		if i > 0 {
-			qs += ","
+	placeholderIdx := 1
+	var valuePlaceholders []string
+	for range objects {
+		var rowPlaceholders []string
+		for range cols {
+			rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("$%d", placeholderIdx))
+			placeholderIdx++
 		}
-		qs += "?"
+		valuePlaceholders = append(valuePlaceholders, fmt.Sprintf("(%s)", strings.Join(rowPlaceholders, ",")))
 	}
-	qs += ")"
-	// append as many (?,?) parts as there are objects to insert
-	for i := 0; i < len(objects); i++ {
-		if i > 0 {
-			insertSQL += ","
-		}
-		insertSQL += qs
-	}
+	insertSQL += strings.Join(valuePlaceholders, ",")
 
 	if onDupKeyUpdate {
-		// format: ON DUPLICATE KEY UPDATE a=VALUES(a), b=VALUES(b), c=VALUES(c)
-		insertSQL += " ON DUPLICATE KEY UPDATE "
-
-		// If this wasn't explicitly set, we want to update all columns
+		// PostgreSQL upsert: ON CONFLICT (key) DO UPDATE SET col=EXCLUDED.col
 		if len(onDupKeyFields) == 0 {
 			onDupKeyFields = cols
 		}
-
+		// Assume first key is the conflict target
+		conflictTarget := onDupKeyFields[0]
+		insertSQL += fmt.Sprintf(" ON CONFLICT (%s) DO UPDATE SET ", conflictTarget)
 		for i, c := range onDupKeyFields {
 			if i > 0 {
-				insertSQL += ","
+				insertSQL += ", "
 			}
-			insertSQL += "`" + c + "`=VALUES(`" + c + "`)"
+			insertSQL += fmt.Sprintf("%s=EXCLUDED.%s", c, c)
 		}
 	}
 
-	vals = []interface{}{}
+	vals = []any{}
 	for _, obj := range objects {
 		for _, col := range cols {
 			if val, ok := obj[col]; ok {

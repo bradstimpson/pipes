@@ -22,7 +22,7 @@ func (s *executionStat) recordExecution(foo func()) {
 	s.executionsCounter++
 	st := time.Now()
 	foo()
-	s.totalExecutionTime += time.Now().Sub(st).Seconds()
+	s.totalExecutionTime += time.Since(st).Seconds()
 }
 
 func (s *executionStat) recordDataSent(d data.JSON) {

@@ -1,12 +1,11 @@
 package processors
 
-// http://docs.aws.amazon.com/sdk-for-go/api/service/s3/S3.html
-
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bradstimpson/pipes/data"
 	"github.com/bradstimpson/pipes/logger"
 	"github.com/bradstimpson/pipes/util"
@@ -15,7 +14,7 @@ import (
 // S3Reader handles retrieving objects from S3. Use NewS3ObjectReader to read
 // a single object, or NewS3PrefixReader to read all objects matching the same
 // prefix in your bucket.
-// S3Reader embeds an IoReeader, so it will support the same configuration
+// S3Reader embeds an IoReader, so it will support the same configuration
 // options as IoReader.
 type S3Reader struct {
 	IoReader            // embeds IoReader
@@ -24,17 +23,23 @@ type S3Reader struct {
 	prefix              string
 	DeleteObjects       bool
 	processedObjectKeys []string
-	client              *s3.S3
+	client              *s3.Client
 }
 
 // NewS3ObjectReader reads a single object from the given S3 bucket
 func NewS3ObjectReader(awsID, awsSecret, awsRegion, bucket, object string) *S3Reader {
 	r := S3Reader{bucket: bucket, object: object}
 	r.IoReader.LineByLine = true
-	creds := credentials.NewStaticCredentials(awsID, awsSecret, "")
-	// .WithLogLevel(aws.LogDebugWithRequestRetries | aws.LogDebugWithRequestErrors)
-	conf := aws.NewConfig().WithRegion(awsRegion).WithDisableSSL(true).WithCredentials(creds)
-	r.client = s3.New(session.New(conf))
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(awsRegion),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			awsID, awsSecret, "",
+		)),
+	)
+	if err != nil {
+		panic("failed to load AWS config: " + err.Error())
+	}
+	r.client = s3.NewFromConfig(cfg)
 	return &r
 }
 
@@ -55,24 +60,24 @@ func NewS3PrefixReader(awsID, awsSecret, awsRegion, bucket, prefix string) *S3Re
 func (r *S3Reader) ProcessData(d data.JSON, outputChan chan data.JSON, killChan chan error) {
 	if r.prefix != "" {
 		logger.Debug("S3Reader: process data for prefix", r.prefix)
-		objects, err := util.ListS3Objects(r.client, r.bucket, r.prefix)
+		objects, err := util.ListS3ObjectsV2(context.TODO(), r.client, r.bucket, r.prefix)
 		logger.Debug("S3Reader: list =", objects)
 		util.KillPipelineIfErr(err, killChan)
 		for _, o := range objects {
-			obj, err := util.GetS3Object(r.client, r.bucket, o)
+			obj, err := util.GetS3ObjectV2(context.TODO(), r.client, r.bucket, o)
 			util.KillPipelineIfErr(err, killChan)
 			r.processObject(obj, outputChan, killChan)
 			r.processedObjectKeys = append(r.processedObjectKeys, o)
 		}
 	} else {
 		logger.Debug("S3Reader: process data for object", r.object)
-		obj, err := util.GetS3Object(r.client, r.bucket, r.object)
+		obj, err := util.GetS3ObjectV2(context.TODO(), r.client, r.bucket, r.object)
 		util.KillPipelineIfErr(err, killChan)
 		r.processObject(obj, outputChan, killChan)
 		r.processedObjectKeys = append(r.processedObjectKeys, r.object)
 	}
 	if r.DeleteObjects {
-		_, err := util.DeleteS3Objects(r.client, r.bucket, r.processedObjectKeys)
+		_, err := util.DeleteS3ObjectsV2(context.TODO(), r.client, r.bucket, r.processedObjectKeys)
 		util.KillPipelineIfErr(err, killChan)
 	}
 }
@@ -86,6 +91,11 @@ func (r *S3Reader) processObject(obj *s3.GetObjectOutput, outputChan chan data.J
 	r.IoReader.Reader = obj.Body
 	r.IoReader.ProcessData(nil, outputChan, killChan)
 	obj.Body.Close()
+}
+
+// SetClient overrides the S3 client (useful for testing/benchmarks).
+func (r *S3Reader) SetClient(c *s3.Client) {
+	r.client = c
 }
 
 func (r *S3Reader) String() string {

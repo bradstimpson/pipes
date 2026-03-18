@@ -41,9 +41,9 @@ func ExampleObjectsFromJSON() {
 
 func ExampleJSONFromHeaderAndRows() {
 	header := []string{"A", "B", "C"}
-	rows := [][]interface{}{
-		[]interface{}{1, 2, 3},
-		[]interface{}{4, 5, 6},
+	rows := [][]any{
+		{1, 2, 3},
+		{4, 5, 6},
 	}
 
 	d, _ := data.JSONFromHeaderAndRows(header, rows)

@@ -71,7 +71,7 @@ func CSVProcess(params *CSVParameters, d data.JSON, outputChan chan data.JSON, k
 		err = params.Writer.WriteAll(rows)
 		KillPipelineIfErr(err, killChan)
 
-		outputChan <- []byte(b.String())
+		outputChan <- b.Bytes()
 	} else {
 		err = params.Writer.WriteAll(rows)
 		KillPipelineIfErr(err, killChan)

@@ -34,7 +34,7 @@ func (t *Timer) Duration() time.Duration {
 	if t.Stopped() {
 		return t.endTime.Sub(t.startTime)
 	}
-	return time.Now().Sub(t.startTime)
+	return time.Since(t.startTime)
 }
 
 func (t *Timer) String() string {

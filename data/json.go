@@ -15,7 +15,7 @@ import (
 type JSON []byte
 
 // NewJSON is a simple wrapper for json.Marshal.
-func NewJSON(v interface{}) (JSON, error) {
+func NewJSON(v any) (JSON, error) {
 	d, err := json.Marshal(v)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("data: failure to marshal JSON %+v - error is \"%v\"", v, err.Error()))
@@ -25,7 +25,7 @@ func NewJSON(v interface{}) (JSON, error) {
 }
 
 // ParseJSON is a simple wrapper for json.Unmarshal
-func ParseJSON(d JSON, v interface{}) error {
+func ParseJSON(d JSON, v any) error {
 	err := json.Unmarshal(d, v)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("data: failure to unmarshal JSON into %+v - error is \"%v\"", v, err.Error()))
@@ -36,7 +36,7 @@ func ParseJSON(d JSON, v interface{}) error {
 
 // ParseJSONSilent won't log output when unmarshaling fails.
 // It can be used in cases where failure is expected.
-func ParseJSONSilent(d JSON, v interface{}) error {
+func ParseJSONSilent(d JSON, v any) error {
 	return json.Unmarshal(d, v)
 }
 
@@ -44,8 +44,8 @@ func ParseJSONSilent(d JSON, v interface{}) error {
 // generic maps/objects. The use-case is when a stage is expecting
 // to receive either a JSON object or an array of JSON objects, and
 // want to deal with it in a generic fashion.
-func ObjectsFromJSON(d JSON) ([]map[string]interface{}, error) {
-	var objects []map[string]interface{}
+func ObjectsFromJSON(d JSON) ([]map[string]any, error) {
+	var objects []map[string]any
 
 	// return if we have null instead of object(s).
 	if bytes.Equal(d, []byte("null")) {
@@ -53,7 +53,7 @@ func ObjectsFromJSON(d JSON) ([]map[string]interface{}, error) {
 		return objects, nil
 	}
 
-	var v interface{}
+	var v any
 	err := ParseJSON(d, &v)
 	if err != nil {
 		return nil, err
@@ -61,13 +61,13 @@ func ObjectsFromJSON(d JSON) ([]map[string]interface{}, error) {
 
 	// check if we have a single object or a slice of objects
 	switch vv := v.(type) {
-	case []interface{}:
+	case []any:
 		for _, o := range vv {
-			objects = append(objects, o.(map[string]interface{}))
+			objects = append(objects, o.(map[string]any))
 		}
-	case map[string]interface{}:
-		objects = []map[string]interface{}{vv}
-	case []map[string]interface{}:
+	case map[string]any:
+		objects = []map[string]any{vv}
+	case []map[string]any:
 		objects = vv
 	default:
 		err = fmt.Errorf("ObjectsFromJSON: unsupported data type: %T", vv)
@@ -79,7 +79,7 @@ func ObjectsFromJSON(d JSON) ([]map[string]interface{}, error) {
 
 // JSONFromHeaderAndRows takes the given header and rows of values, and
 // turns it into a JSON array of objects.
-func JSONFromHeaderAndRows(header []string, rows [][]interface{}) (JSON, error) {
+func JSONFromHeaderAndRows(header []string, rows [][]any) (JSON, error) {
 	var b bytes.Buffer
 	b.Write([]byte("["))
 	for i, row := range rows {

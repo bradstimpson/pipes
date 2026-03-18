@@ -1,26 +1,26 @@
-package processors_test
+package processors
 
 import (
 	"fmt"
 	"os"
 	"strings"
+	"testing"
 
 	"github.com/bradstimpson/pipes"
 	"github.com/bradstimpson/pipes/data"
 	"github.com/bradstimpson/pipes/logger"
-	"github.com/bradstimpson/pipes/processors"
 )
 
 func ExampleNewHTTPRequest() {
 	logger.LogLevel = logger.LevelSilent
 
-	getGoogle, err := processors.NewHTTPRequest("GET", "http://www.google.com", nil)
+	getGoogle, err := NewHTTPRequest("GET", "http://www.google.com", nil)
 	if err != nil {
 		panic(err)
 	}
 	// this is just a really basic checking function so we can have
 	// determinable example output.
-	checkHTML := processors.NewFuncTransformer(func(d data.JSON) data.JSON {
+	checkHTML := NewFuncTransformer(func(d data.JSON) data.JSON {
 		output := "Got HTML?\n"
 		if strings.Contains(strings.ToLower(string(d)), "html") {
 			output += "YES\n"
@@ -35,7 +35,7 @@ func ExampleNewHTTPRequest() {
 		}
 		return data.JSON(output)
 	})
-	stdout := processors.NewIoWriter(os.Stdout)
+	stdout := NewIoWriter(os.Stdout)
 	pipeline := pipes.NewPipeline(getGoogle, checkHTML, stdout)
 
 	err = <-pipeline.Run()
@@ -49,4 +49,17 @@ func ExampleNewHTTPRequest() {
 	// YES
 	// HTML contains Google Search?
 	// YES
+}
+
+func TestNewHTTPRequest(t *testing.T) {
+	httpReq, err := NewHTTPRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if httpReq.Request.Method != "GET" {
+		t.Errorf("Expected method 'GET', got '%s'", httpReq.Request.Method)
+	}
+	if httpReq.Request.URL.String() != "http://example.com" {
+		t.Errorf("Expected URL 'http://example.com', got '%s'", httpReq.Request.URL.String())
+	}
 }

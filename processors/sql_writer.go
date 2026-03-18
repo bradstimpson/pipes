@@ -32,12 +32,13 @@ type SQLWriter struct {
 // extra configuration is needed to use SQLWriterData, each data payload
 // received is first checked for this structure before processing.
 type SQLWriterData struct {
-	TableName  string      `json:"table_name"`
-	InsertData interface{} `json:"insert_data"`
+	TableName  string `json:"table_name"`
+	InsertData any    `json:"insert_data"`
 }
 
 // NewSQLWriter returns a new SQLWriter
 func NewSQLWriter(db *sql.DB, tableName string) *SQLWriter {
+	logger.Info("SQLWriter: Initializing SQLWriter with db: ", db, "and tableName:", tableName)
 	return &SQLWriter{writeDB: db, TableName: tableName, OnDupKeyUpdate: true}
 }
 
@@ -53,16 +54,22 @@ func (s *SQLWriter) ProcessData(d data.JSON, outputChan chan data.JSON, killChan
 	// First check for SQLWriterData
 	var wd SQLWriterData
 	err := data.ParseJSONSilent(d, &wd)
-	logger.Info("SQLWriter: Writing data...")
+	logger.Info("SQLWriter: Writing data...", string(d))
 	if err == nil && wd.TableName != "" && wd.InsertData != nil {
 		logger.Debug("SQLWriter: SQLWriterData scenario")
 		dd, err := data.NewJSON(wd.InsertData)
 		util.KillPipelineIfErr(err, killChan)
 		err = util.SQLInsertData(s.writeDB, dd, wd.TableName, s.OnDupKeyUpdate, s.OnDupKeyFields, s.BatchSize)
+		if err != nil {
+			logger.Error("SQLWriter: error inserting data", err)
+		}
 		util.KillPipelineIfErr(err, killChan)
 	} else {
 		logger.Debug("SQLWriter: normal data scenario")
 		err = util.SQLInsertData(s.writeDB, d, s.TableName, s.OnDupKeyUpdate, s.OnDupKeyFields, s.BatchSize)
+		if err != nil {
+			logger.Error("SQLWriter: error inserting data", err)
+		}
 		util.KillPipelineIfErr(err, killChan)
 	}
 	logger.Info("SQLWriter: Write complete")
